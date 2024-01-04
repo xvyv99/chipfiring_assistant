@@ -2,7 +2,7 @@ import sys
 
 func_lst = set()
 special_lst = set()
-#由于在类中装饰器无法访问这个变量, 所以直接当全局变量了
+# NOTE:由于在类中装饰器无法访问这个变量, 所以直接当全局变量了
 
 def comm_conversion(comm):
     comm_sp = comm.split(' ')
@@ -12,8 +12,7 @@ def comm_conversion(comm):
 
 def para_reorganize(param):
     '''
-    参数重整, 其中输入ABC,"ABC"或是'ABC'都算字符串"ABC"
-    下一步实现变量传参
+    参数重整, 输入中的ABC,"ABC"或是'ABC'都算字符串"ABC"
     '''
     para_refresh = []
     symbol_left = ("\'","\"","[","(","{")
@@ -43,7 +42,7 @@ def para_reorganize(param):
 class Console:
     """
     为程序创建一个命令行环境
-    下一步加入变量声明,以及选项参数
+    下一步加入选项参数
     """
     __Version = "Console beta 0.22"
     def __init__(self):

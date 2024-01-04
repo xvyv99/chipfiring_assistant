@@ -20,7 +20,7 @@ class Chip_Firing(UGraph):
             flg = False
         return flg
     
-    def Firing_plain(self,id,val:list):
+    def Firing_plain(self,id,val:list) -> (list,bool):
         '''也是游戏中的firing操作,但对原图的权值无影响'''
         flg = True
         ret = val.copy() #由于val_lst中储存的是整数, 故仅用浅拷贝即可
