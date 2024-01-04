@@ -26,8 +26,8 @@ class Chip_Firing(UGraph):
         ret = val.copy() #由于val_lst中储存的是整数, 故仅用浅拷贝即可
         op_node = self.Get_node(id) #操作的节点
         if ret[id] >= op_node.Degree: #判断
-            ret[id] -= self.op_node.Degree
-            for x in self.op_node.Edge:
+            ret[id] -= op_node.Degree
+            for x in op_node.Edge:
                 ret[x] += 1
         else:
             flg = False

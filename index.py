@@ -201,7 +201,7 @@ class CF_Sim_Fix_1(CF_Sim):
 class CF_Sim_Fix_1(CF_Sim):
     def __init__(self,matrix:np,v_sum):
         self.time_rec = time.time()
-        
+        self.I
         self.History_data = Id_Set()
         self.History_list = []
         self.History_graph = nx.DiGraph()
@@ -269,22 +269,13 @@ class CF_Sim_Fix_1(CF_Sim):
 
         nx.write_gexf(self.History_graph,'test.gexf')
 
-    def create_VL(self,val_sum): #有待考究
-        ret:np.ndarray = CF_Sim.create_VL(self)
-        flg = 1 if ret.sum()>val_sum else -1
-        while ret.sum()!=val_sum:
-            r = np.random.randint(0,self.Shape[0])
-            ret[r] -= flg if ret[r]>0 else 0
-        return ret
 
 class CF_sim_W(CF_Sim_Fix_1):
     def __init__(self,matrix,v_sum):
         self.time_rec = time.time()
         os.mkdir(str(self.time_rec))
-        self.I = 1
-        self.Val_sum = v_sum
-        self.History_data = Id_Set()
-        self.History_list = []
+        self.Xs = v_sum
+        self.History = set()
         self.History_graph = nx.DiGraph()
         self.Shape = matrix.shape
         self.Matrix = matrix
@@ -292,26 +283,6 @@ class CF_sim_W(CF_Sim_Fix_1):
         self.Init_values = []
 
         self.show_init()
-
-    def main(self):
-        for x in self.create_VL_plain(self.Shape[0],self.Val_sum):
-            #print("Init value:",x)
-            self.Init_values = x
-            self.plain_search_while()
-            self.I += 1
-        color_m = nx.get_node_attributes(self.History_graph,"color").values()
-        if len(self.History_list) != len(set(self.History_list)):
-            raise "Has error."
-        #print("[F]The number of state:",len(self.History_list))
-        #print("[F]The state",self.History_list)
-        nx.draw_networkx(self.History_graph,node_color=color_m,with_labels=True)
-        plt.savefig(str(self.time_rec)+'\PST_all.png',dpi = 128)
-        nx.write_gexf(self.History_graph,str(self.time_rec)+'\PST.gexf')
-        Tmp = 0
-        for i,__ in enumerate(nx.connected_components(nx.Graph(self.History_graph))):
-            Tmp += 1
-        print(f"This Gs has {Tmp} islands.")
-        #plt.show()
 
     def show_init(self):
         with open(f"{self.time_rec}\info.txt", "w") as f:
@@ -325,80 +296,95 @@ class CF_sim_W(CF_Sim_Fix_1):
         plt.close()
         #plt.show()
 
-    def create_VL_plain(self,n,val_sum):
-        if n==1:
-            yield [val_sum]
-        elif n<1:
+    def Erg_vals(self,length,xs):
+        '''不重复地生成长度一定,和为定值的非负整数列表 仍需改进'''
+        if length==1:
+            yield [xs]
+        elif length<1:
             yield -1
-        for x in range(val_sum+1):
-            g = self.create_VL_plain(n-1,val_sum-x)
+        for x in range(xs+1):
+            g = self.Erg_vals(length-1,xs-x)
             for y in g:
                 if y == -1:
                     g.close()
-                    continue
+                    continue #可能存在冗余
                 else:
                     yield [x]+y
 
-    def Plain_Search_All(self,Xs):
-        '''构建状态空间图'''
-        history_lst_self =[]
-        history_graph_self = nx.DiGraph()
-        color_dict = {"Red":"#FF0000","Blue":"#1f78b4","Yellow":"#FFFF00","Green":"#33a02c","Grey":"#C0C0C0"}
-        def step(val_lst):
-            Gid = ','.join([str(x) for x in val_lst])
+    def Plain_search(self,vals:list,draw_option=True):
+        '''构建子状态空间树和部分状态空间图'''
+        history =[] #子状态空间
+        history_graph = nx.DiGraph() #子状态空间树
+        color_dict = {"Red":"#FF0000","Blue":"#1f78b4","Yellow":"#FFFF00","Green":"#33a02c","Grey":"#C0C0C0"} #颜色代码字典
+
+        def step(val_lst:list):
+            '''单步搜索归递函数'''
+            gid = ','.join([str(x) for x in val_lst]) #父节点的标签
             for x in range(self.Shape[0]):
-                res,flg = self.firing_plain(x,val_lst) #冗余
-                if flg and (tuple(res) not in self.History_list):
-                    node_id = ','.join([str(x) for x in res])
-                    self.History_list.append(tuple(res))
-                    if np.all(res <= (self.Degrees-1)):
-                        self.History_graph.add_node(node_id,color=color_dict["Grey"])
-                        self.History_graph.add_edge(Gid,node_id,toward=x)
-                        #print(Gid,f'--[{x}]->',node_id)
+                res,flg = self.Firing_plain(x,val_lst) #Firing操作
+                if flg:
+                    node_id = ','.join([str(x) for x in res]) #生成子节点标签
+                    if (tuple(res) not in self.History):
+                        self.History.add(tuple(res))
+                        if np.all(res <= (self.Degrees-1)): #判断节点是否死锁
+                            self.History_graph.add_node(node_id,color=color_dict["Grey"])
+                            self.History_graph.add_edge(gid,node_id,toward=x)
+                            #是则将节点变为灰色
+                        else:
+                            self.History_graph.add_node(node_id,color=color_dict["Blue"])
+                            self.History_graph.add_edge(gid,node_id,toward=x)
+                            #否则将节点变为蓝色
                     else:
-                        #print(Gid,f'--[{x}]->',node_id)
-                        self.History_graph.add_node(node_id,color=color_dict["Blue"])
-                        self.History_graph.add_edge(Gid,node_id,toward=x)
-                elif flg:
-                    node_id = ','.join([str(x) for x in res])
-                    #print(Gid,f'--[{x}]->',node_id)
-                    self.History_graph.add_edge(Gid,node_id,toward=x)
-                if flg and (tuple(res) not in history_lst_self):
-                    node_id = ','.join([str(x) for x in res])
-                    history_lst_self.append(tuple(res))
-                    if np.all(res <= (self.Degrees-1)):
-                        history_graph_self.add_node(node_id,color=color_dict["Grey"])
-                        history_graph_self.add_edge(Gid,node_id,toward=x)
+                        self.History_graph.add_edge(gid,node_id,toward=x)
+                    #构建状态空间图过程
+
+                    if (tuple(res) not in history):
+                        history.add(tuple(res))
+                        if np.all(res <= (self.Degrees-1)):
+                            history_graph.add_node(node_id,color=color_dict["Grey"]) #灰色节点为死锁节点
+                            history_graph.add_edge(gid,node_id,toward=x)
+                        else:
+                            history_graph.add_node(node_id,color=color_dict["Blue"]) #绿色节点为正常节点
+                            history_graph.add_edge(gid,node_id,toward=x)
+
                     else:
-                        history_graph_self.add_node(node_id,color=color_dict["Green"])
-                        history_graph_self.add_edge(Gid,node_id,toward=x)
-                    #print(Gid,f'--[{x}]->',node_id)
+                        if np.all(res == val_lst):
+                            history_graph.add_node(node_id,color=color_dict["Yellow"]) #黄色节点代表与初始状态相同的节点
+                        else:
+                            history_graph.add_node(node_id,color=color_dict["Red"]) #红色节点代表重复的结束节点
+                        history_graph.add_edge(gid,node_id,toward=x)
+                    #构建子状态空间树过程
+
                     step(res)
-                elif flg == True:
-                    node_id = ' '.join([str(x) for x in res])
-                    if np.all(res == self.Init_values):
-                        history_graph_self.add_node(node_id,color=color_dict["Yellow"])
-                    else:
-                        history_graph_self.add_node(node_id,color=color_dict["Red"])
-                    history_graph_self.add_edge(Gid,node_id,toward=x)
-        init_id = ','.join([str(x) for x in self.Init_values])
-        if tuple(self.Init_values) not in self.History_list:
-            self.History_list.append(tuple(self.Init_values))
+
+        init_id = ','.join([str(x) for x in vals]) #生成子状态空间树的根节点的标签
+        if tuple(vals) not in self.History:
+            self.History.add(tuple(vals))
             self.History_graph.add_node(init_id,color=color_dict["Blue"])
 
-        history_lst_self.append(tuple(self.Init_values))
-        history_graph_self.add_node(init_id,color=color_dict["Blue"])
-        step(self.Init_values)
+        history.add(tuple(vals))
+        history_graph.add_node(init_id,color=color_dict["Blue"])
+        step(vals)
+        #初始化
 
-        color_map = nx.get_node_attributes(history_graph_self,"color").values()
-        pos_n = nx.nx_agraph.graphviz_layout(history_graph_self, prog="dot")
-
-        nx.draw_networkx(history_graph_self,node_color=color_map,pos=pos_n,with_labels=True)
-        #plt.savefig(f'{str(self.time_rec)}\PST_{self.I}.png')
-        plt.close()
-        #plt.show()
-        #print(f"[{self.I}]The init values:{self.Init_values}")
-        #print(f"[{self.I}]The number of state in this init:{len(history_lst_self)}")
-        #print(f"[{self.I}]The state in this init:{history_lst_self}")
-
-        #nx.write_gexf(self.History_graph,'test.gexf')
+        color_map = nx.get_node_attributes(history_graph,"color").values() #节点的颜色表
+        pos_tree = nx.nx_agraph.graphviz_layout(history_graph, prog="dot") #树状布局
+        #nx.draw_networkx方法需要
+        if draw_option:
+            nx.draw_networkx(history_graph,node_color=color_map,pos=pos_tree,with_labels=True) #绘制子状态空间树
+            plt.show()
+            plt.close()
+        
+    def Build_all(self,xs):
+        '''构建完整的状态空间图'''
+        for x in self.Erg_vals(self.Shape[0],xs):
+            self.Plain_search(x)
+        color_m = nx.get_node_attributes(self.History_graph,"color").values()
+        nx.draw_networkx(self.History_graph,node_color=color_m,with_labels=True)
+        plt.savefig(str(self.time_rec)+'\PST_all.png',dpi = 128)
+        plt.show()
+        nx.write_gexf(self.History_graph,str(self.time_rec)+'\PST.gexf')
+        Tmp = 0
+        for i,__ in enumerate(nx.connected_components(nx.Graph(self.History_graph))):
+            Tmp += 1
+        print(f"This Gs has {Tmp} islands.")

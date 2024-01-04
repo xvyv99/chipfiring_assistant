@@ -2,20 +2,20 @@ import numpy as np
 
 class Node:
     """图的节点"""
-    __Version = "Node beta 0.2"
+    __Version = "Node beta 0.21"
     def __init__(self,id):
         self.Id:int = id #节点的编号
         self.Value:float = 1.0 #节点的权值
-        self.__Edge:set = set() #指向其他节点的边
+        self.Edge:set = set() #指向其他节点的边
 
     def Add_edge(self,node):
         '''增加单项边,从self指向node'''
-        self.__Edge.add(node.Id)
+        self.Edge.add(node.Id)
 
     @property
     def Degree(self):
         '''获取节点的度'''
-        return len(self.__Edge)
+        return len(self.Edge)
 
 class UGraph:
     """
@@ -26,7 +26,7 @@ class UGraph:
         if self.Symmetric_check(matrix):
             self.Adj_matrix = matrix #图的邻接矩阵
         else:
-            raise "[Error]The adjacency matrix can't generate a undirect graph."
+            raise Exception("[Error]The adjacency matrix can't generate a undirect graph.")
         self.N = matrix.shape[0] #图的节点个数
 
         self.Node_lst = [Node(i) for i in range(self.N)] #图中所包含的节点列表, 编号 从0开始
@@ -41,7 +41,7 @@ class UGraph:
         flg = True
         (m,n) = matrix.shape
         flg = False if m != n else True #检查是否为方阵
-        flg = False if np.all(matrix == matrix.transpose()) else True #检查转置后是否等于原来的矩阵
+        flg = False if not np.all(matrix == matrix.transpose()) else True #检查转置后是否等于原来的矩阵
         return flg
     
     def Get_node(self,id):
